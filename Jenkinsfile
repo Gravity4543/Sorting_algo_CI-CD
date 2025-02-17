@@ -1,5 +1,8 @@
 pipeline {
     agent any
+    tools {
+        terraform 'terraform' // Use the Terraform tool configured in Jenkins
+    }
 
     environment {
         // Define variables for username and server IP
