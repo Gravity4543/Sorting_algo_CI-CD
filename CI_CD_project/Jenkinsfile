@@ -10,7 +10,7 @@ pipeline {
     stages {
         stage('Terraform Apply') {
             steps {
-                dir('terraform') { // Change to the directory containing your Terraform files
+                dir('CI_CD_project') { // Change to the directory containing your Terraform files
                     sh """
                         # Initialize Terraform
                         terraform init
@@ -18,13 +18,11 @@ pipeline {
                         # Apply Terraform configuration
                         terraform apply -auto-approve
 
-                        # Retrieve the public IP from Terraform output
-                        SERVER_IP=$(terraform output -raw public_ip)
-                        echo "Server Public IP: ${SERVER_IP}"
                     """
                     script {
                         // Store the public IP in an environment variable for later stages
                         env.SERVER_IP = sh(script: 'terraform output -raw public_ip', returnStdout: true).trim()
+                        echo "Server Public IP: ${env.SERVER_IP}"
                     }
                 }
             }
@@ -39,7 +37,7 @@ pipeline {
 
                     while (retryCount < maxRetries && !ready) {
                         try {
-                            sshagent(['f09c0c92-98fc-4b27-a039-debec7355422']) {
+                            sshagent(['3fb305d6-575d-4463-9284-a1597e54c692']) {
                                 // Check if the flag file exists
                                 sh """
                                     ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SERVER_IP} \
@@ -60,28 +58,15 @@ pipeline {
                 }
             }
         }
-        stage('Docker Build and Run') {
-            steps {
-                sshagent(['f09c0c92-98fc-4b27-a039-debec7355422']) {
-                    sh """
-                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SERVER_IP} "
-                        cd /tmp/example-repo
-                        docker build -t myapp .
-                        docker run -d -p 80:80 myapp
-                    "
-                    """
-                }
-            }
-        }
     }
-
     post {
-        always {
-            dir('terraform') {
-                sh """
-                    # Destroy Terraform resources to clean up
-                    terraform destroy -auto-approve
-                """
+    always {
+        dir('terraform') {
+            sh """
+                echo "destroying the terraform module"
+                # Destroy Terraform resources to clean up
+                terraform destroy -auto-approve
+            """
             }
         }
     }
