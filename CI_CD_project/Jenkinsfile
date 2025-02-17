@@ -1,0 +1,88 @@
+pipeline {
+    agent any
+
+    environment {
+        // Define variables for username and server IP
+        SSH_USER = 'ubuntu'          // Replace with your SSH username
+        GIT_REPO = 'https://github.com/example/example-repo.git' // Replace with your Git repository URL
+    }
+
+    stages {
+        stage('Terraform Apply') {
+            steps {
+                dir('terraform') { // Change to the directory containing your Terraform files
+                    sh """
+                        # Initialize Terraform
+                        terraform init
+
+                        # Apply Terraform configuration
+                        terraform apply -auto-approve
+
+                        # Retrieve the public IP from Terraform output
+                        SERVER_IP=$(terraform output -raw public_ip)
+                        echo "Server Public IP: ${SERVER_IP}"
+                    """
+                    script {
+                        // Store the public IP in an environment variable for later stages
+                        env.SERVER_IP = sh(script: 'terraform output -raw public_ip', returnStdout: true).trim()
+                    }
+                }
+            }
+        }
+
+        stage('Wait for Server Readiness') {
+            steps {
+                script {
+                    retryCount = 0
+                    maxRetries = 30  // 30 attempts * 20s = 10min timeout
+                    ready = false
+
+                    while (retryCount < maxRetries && !ready) {
+                        try {
+                            sshagent(['f09c0c92-98fc-4b27-a039-debec7355422']) {
+                                // Check if the flag file exists
+                                sh """
+                                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SERVER_IP} \
+                                        "test -f /tmp/provisioned.ok && echo 'Server ready'"
+                                """
+                                ready = true
+                            }
+                        } catch (err) {
+                            echo "Server not ready yet (attempt ${retryCount}/${maxRetries}). Retrying in 20s..."
+                            sleep(20)
+                            retryCount++
+                        }
+                    }
+
+                    if (!ready) {
+                        error("Server provisioning timed out after ${maxRetries} attempts.")
+                    }
+                }
+            }
+        }
+        stage('Docker Build and Run') {
+            steps {
+                sshagent(['f09c0c92-98fc-4b27-a039-debec7355422']) {
+                    sh """
+                    ssh -o StrictHostKeyChecking=no ${SSH_USER}@${SERVER_IP} "
+                        cd /tmp/example-repo
+                        docker build -t myapp .
+                        docker run -d -p 80:80 myapp
+                    "
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            dir('terraform') {
+                sh """
+                    # Destroy Terraform resources to clean up
+                    terraform destroy -auto-approve
+                """
+            }
+        }
+    }
+}
