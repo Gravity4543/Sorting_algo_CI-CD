@@ -19,7 +19,7 @@ pipeline {
                         terraform init
 
                         # Apply Terraform configuration
-                        terraform apply -auto-approve
+                        terraform apply --auto-approve
 
                     """
                     script {
