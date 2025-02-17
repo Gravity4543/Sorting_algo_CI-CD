@@ -13,7 +13,7 @@ pipeline {
     stages {
         stage('Terraform Apply') {
             steps {
-                dir('CI_CD_project') { // Change to the directory containing your Terraform files
+                dir('') { // Change to the directory containing your Terraform files
                     sh """
                         # Initialize Terraform
                         terraform init
