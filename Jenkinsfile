@@ -7,7 +7,8 @@ pipeline {
     environment {
         // Define variables for username and server IP
         SSH_USER = 'ubuntu'          // Replace with your SSH username
-        GIT_REPO = 'https://github.com/example/example-repo.git' // Replace with your Git repository URL
+        DOCKER_HUB_REPO = 'dockshikhar/webserver' // Replace with your Docker Hub repo
+        DOCKER_HUB_CREDENTIALS = 'dokerid'
     }
 
     stages {
@@ -61,6 +62,37 @@ pipeline {
                 }
             }
         }
+        stage('Check Docker') {
+            steps {
+                script {
+                    sh 'docker --version'
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                dir('project') {
+                    script {
+                        // Build the Docker image with a tag for the build number
+                        docker.build("${DOCKER_HUB_REPO}:${env.BUILD_NUMBER}")
+                    }
+                }
+            }
+        }
+
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                script {
+                    // Authenticate with Docker Hub
+                    docker.withRegistry('https://registry.hub.docker.com', "${DOCKER_HUB_CREDENTIALS}") {
+                        // Push the Docker image
+                        docker.image("${DOCKER_HUB_REPO}:${env.BUILD_NUMBER}").push()
+                    }
+                }
+            }
+        }
+    }
     }
     post {
     always {
