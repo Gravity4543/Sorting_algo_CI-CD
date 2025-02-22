@@ -92,8 +92,17 @@ pipeline {
                 }
             }
         }
+        stage('Delete Local Docker Image') {
+                steps {
+                    script {
+                        // Delete the locally built Docker image
+                        sh "docker rmi ${DOCKER_HUB_REPO}:web_${env.BUILD_NUMBER}"
+                    }
+                }
+            }
+        }
     }
-    }
+    
     post {
     always {
         dir('terraform') {
