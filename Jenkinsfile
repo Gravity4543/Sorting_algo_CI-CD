@@ -18,7 +18,8 @@ pipeline {
                     sh """
                         # Initialize Terraform
                         terraform init
-
+                        #planning terraform
+			terraform plan
                         # Apply Terraform configuration
                         terraform apply --auto-approve
 
@@ -114,4 +115,4 @@ pipeline {
             }
         }
     }
-}
+
